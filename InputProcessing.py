@@ -1,4 +1,8 @@
 import pandas
+from sklearn.covariance import EllipticEnvelope
+from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.svm import OneClassSVM
 
 
 def prepare_weather_data():
@@ -17,6 +21,11 @@ def prepare_weather_data():
 
     return weather_data
 
+def find_outliers(data):
+    iso = LocalOutlierFactor(contamination=0.03)
+    outliers = iso.fit_predict(data)
+    return outliers
+
 
 def prepare_energy_data():
     energy_data = pandas.read_csv("Energy_use_houshold_summary.csv", sep=",")
@@ -30,6 +39,12 @@ def prepare_energy_data():
     # reset index
     energy_data = energy_data.reset_index()
 
+    energy_data["timestamp"] = energy_data["Date"].apply(lambda x:x.toordinal())
+
+
+    # TODO: Remove outliers?
+    energy_data["outliers"] = find_outliers(energy_data[["timestamp", "kWh"]])
+
     # sum over quarter hours
     kwh = energy_data.groupby(energy_data.index // 4).sum()["kWh"]
 
@@ -40,5 +55,8 @@ def prepare_data():
     # merge the two datasets
     data = prepare_weather_data()
     data["kWh"] = prepare_energy_data()
+
+    data["day"] = data["dt_iso"].dt.dayofweek
+    data["precipitation"] = data["rain_1h"].fillna(0) + data["snow_1h"].fillna(0)
 
     return data
